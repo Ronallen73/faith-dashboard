@@ -2,31 +2,14 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Navigation from '@/components/Navigation'
-import {
-  TrendingUp, DollarSign, Package, Clock, AlertCircle,
-  ChevronRight, Flame, Calendar, Sparkles
-} from 'lucide-react'
+import { TrendingUp, DollarSign, Package, Clock, AlertCircle, ChevronRight, Flame, Calendar, Sparkles, Settings } from 'lucide-react'
 import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
 import Link from 'next/link'
 
-interface DashboardData {
-  totalRevenueMonth: number
-  totalProfitMonth: number
-  pendingApprovals: number
-  liveProducts: number
-  recentSales: { date: string; revenue: number }[]
-  upcomingSeason: { name: string; weeks: number; urgency: string } | null
-  taxSetAside: number
-  topProduct: { title: string; revenue: number } | null
-}
-
-const formatCurrency = (n: number) =>
-  n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`
-
-const VERSE = '"Whatever you do, work at it with all your heart." â Col 3:23'
+const VERSE = '"Whatever you do, work at it with all your heart." — Col 3:23'
 
 export default function Dashboard() {
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [greeting, setGreeting] = useState('Good morning')
 
@@ -34,269 +17,159 @@ export default function Dashboard() {
     const h = new Date().getHours()
     if (h >= 12 && h < 17) setGreeting('Good afternoon')
     else if (h >= 17) setGreeting('Good evening')
-    loadDashboard()
+    load()
   }, [])
 
-  async function loadDashboard() {
+  async function load() {
     try {
       const now = new Date()
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
-
-      const [salesRes, productsRes, approvalsRes, seasonsRes] = await Promise.all([
-        supabase.from('sales').select('gross_revenue,net_profit,sale_date,product_id').gte('sale_date', monthStart).eq('is_refunded', false),
+      const [salesRes, productsRes, approvalsRes, seasonsRes, settingsRes] = await Promise.all([
+        supabase.from('sales').select('gross_revenue,net_profit,sale_date').gte('sale_date', monthStart),
         supabase.from('products').select('id,title,total_revenue,status'),
         supabase.from('approval_queue').select('id').eq('status', 'pending'),
         supabase.from('v_upcoming_seasons').select('*').limit(1),
+        supabase.from('settings').select('tax_set_aside_pct').limit(1),
       ])
-
       const sales = salesRes.data || []
       const products = productsRes.data || []
-      const approvals = approvalsRes.data || []
-      const seasons = seasonsRes.data || []
-
-      const totalRevenueMonth = sales.reduce((s, x) => s + (x.gross_revenue || 0), 0)
-      const totalProfitMonth = sales.reduce((s, x) => s + (x.net_profit || 0), 0)
-
+      const taxRate = settingsRes.data?.[0]?.tax_set_aside_pct ? settingsRes.data[0].tax_set_aside_pct / 100 : 0.28
+      const rev = sales.reduce((s:number, x:any) => s + (x.gross_revenue || 0), 0)
+      const profit = sales.reduce((s:number, x:any) => s + (x.net_profit || 0), 0)
       const days: Record<string, number> = {}
-      for (let i = 13; i >= 0; i--) {
-        const d = new Date(); d.setDate(d.getDate() - i)
-        days[d.toISOString().slice(0, 10)] = 0
-      }
-      sales.forEach(s => {
-        const day = s.sale_date?.slice(0, 10)
-        if (day && day in days) days[day] += s.gross_revenue || 0
-      })
-      const recentSales = Object.entries(days).map(([date, revenue]) => ({ date, revenue }))
-
-      const liveProducts = products.filter(p => p.status === 'live').length
-      const topProduct = products.sort((a, b) => (b.total_revenue || 0) - (a.total_revenue || 0))[0] || null
-
-      const taxSetAside = totalProfitMonth * 0.28
-
-      const upcomingSeason = seasons[0]
-        ? { name: seasons[0].season_name, weeks: seasons[0].weeks_to_peak || 0, urgency: seasons[0].urgency }
-        : null
-
+      for (let i = 13; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); days[d.toISOString().slice(0,10)] = 0 }
+      sales.forEach((s:any) => { const day = s.sale_date?.slice(0,10); if (day && day in days) days[day] += s.gross_revenue || 0 })
       setData({
-        totalRevenueMonth, totalProfitMonth, pendingApprovals: approvals.length,
-        liveProducts, recentSales, upcomingSeason, taxSetAside,
-        topProduct: topProduct ? { title: topProduct.title, revenue: topProduct.total_revenue || 0 } : null,
+        rev, profit, taxRate, taxSetAside: profit * taxRate,
+        pending: (approvalsRes.data || []).length,
+        live: products.filter((p:any) => p.status === 'live').length,
+        chart: Object.entries(days).map(([date, revenue]) => ({ date, revenue })),
+        season: seasonsRes.data?.[0] ? { name: seasonsRes.data[0].season_name, weeks: seasonsRes.data[0].weeks_to_peak || 0, urgency: seasonsRes.data[0].urgency } : null,
+        top: products.sort((a:any, b:any) => (b.total_revenue||0)-(a.total_revenue||0))[0] || null,
       })
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
+    } catch(e) { console.error(e) } finally { setLoading(false) }
   }
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload?.length) {
-      return (
-        <div className="bg-surface-3 border border-surface-4 rounded-lg px-3 py-2">
-          <p className="font-mono text-gold-400 text-sm">${payload[0].value.toFixed(0)}</p>
-        </div>
-      )
-    }
-    return null
-  }
+  const fmt = (n: number) => n >= 1000 ? '$' + (n/1000).toFixed(1) + 'k' : '$' + n.toFixed(0)
+  const taxPct = data ? Math.round(data.taxRate * 100) : 28
+
+  const Tip = ({ active, payload }: any) => active && payload?.length ? (
+    <div style={{ background: 'var(--surface-3)', border: '1px solid rgba(201,151,58,0.2)', borderRadius: 10, padding: '8px 12px' }}>
+      <p className="font-mono text-sm" style={{ color: 'var(--gold-light)' }}>{'$' + payload[0].value.toFixed(0)}</p>
+    </div>
+  ) : null
 
   return (
-    <div className="min-h-dvh pb-24">
-      {/* Header */}
-      <div className="px-5 pt-12 pb-6">
+    <div className="min-h-dvh pb-28">
+      <div className="px-5 pt-14 pb-5">
         <div className="flex items-start justify-between mb-1">
           <div>
-            <p className="text-xs tracking-widest uppercase text-gold-500 mb-1 font-medium">Faith Business</p>
-            <h1 className="font-serif text-2xl text-cream">{greeting} â</h1>
+            <p className="text-xs font-semibold tracking-widest mb-1" style={{ color: 'var(--gold)', letterSpacing: '0.15em' }}>✦ FAITH BUSINESS</p>
+            <h1 className="font-serif text-3xl font-semibold" style={{ color: 'var(--cream)', lineHeight: 1.1 }}>{greeting}</h1>
           </div>
-          {data?.pendingApprovals ? (
-            <Link href="/approval">
-              <div className="relative flex items-center gap-2 bg-surface-2 border border-gold-600/40 rounded-xl px-3 py-2">
-                <div className="w-2 h-2 rounded-full bg-gold-400 animate-pulse-gold" />
-                <span className="text-gold-400 text-sm font-medium">{data.pendingApprovals} pending</span>
+          <div className="flex items-center gap-2 mt-1">
+            {data?.pending ? (
+              <Link href="/approval">
+                <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: 'rgba(201,151,58,0.1)', border: '1px solid rgba(201,151,58,0.25)' }}>
+                  <div className="w-2 h-2 rounded-full" style={{ background: 'var(--gold)', animation: 'pulseGold 2s infinite' }} />
+                  <span className="text-sm font-medium" style={{ color: 'var(--gold-light)' }}>{data.pending}</span>
+                </div>
+              </Link>
+            ) : null}
+            <Link href="/settings">
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'var(--surface-2)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <Settings size={16} style={{ color: 'rgba(240,235,224,0.4)' }} />
               </div>
             </Link>
-          ) : null}
+          </div>
         </div>
         <p className="scripture-text mt-3">{VERSE}</p>
       </div>
 
-      <div className="px-4 space-y-4 page-enter">
-
-        {/* Revenue + Profit row */}
+      <div className="px-4 space-y-3 page-enter">
         <div className="grid grid-cols-2 gap-3">
           <div className="card">
             <div className="stat-label mb-3">This Month</div>
-            {loading ? (
-              <div className="skeleton h-8 w-24 mb-1" />
-            ) : (
-              <div className="stat-value text-green-400" style={{ color: 'var(--green)' }}>
-                {formatCurrency(data?.totalRevenueMonth || 0)}
-              </div>
-            )}
-            <div className="flex items-center gap-1 mt-2">
-              <DollarSign size={12} style={{ color: 'var(--green)' }} />
-              <span className="text-xs" style={{ color: 'rgba(76,175,125,0.7)' }}>Revenue</span>
-            </div>
+            {loading ? <div className="skeleton h-9 w-24 mb-1" /> : <div className="stat-value" style={{ color: 'var(--green)' }}>{fmt(data?.rev || 0)}</div>}
+            <div className="flex items-center gap-1.5 mt-2"><DollarSign size={11} style={{ color: 'var(--green)', opacity: 0.7 }} /><span className="text-xs" style={{ color: 'rgba(76,175,125,0.6)' }}>Revenue</span></div>
           </div>
-
           <div className="card">
             <div className="stat-label mb-3">Profit</div>
-            {loading ? (
-              <div className="skeleton h-8 w-20 mb-1" />
-            ) : (
-              <div className="stat-value" style={{ color: 'var(--gold-light)' }}>
-                {formatCurrency(data?.totalProfitMonth || 0)}
-              </div>
-            )}
-            <div className="flex items-center gap-1 mt-2">
-              <TrendingUp size={12} style={{ color: 'var(--gold)' }} />
-              <span className="text-xs" style={{ color: 'rgba(201,151,58,0.7)' }}>Net</span>
-            </div>
+            {loading ? <div className="skeleton h-9 w-20 mb-1" /> : <div className="stat-value" style={{ color: 'var(--gold-light)' }}>{fmt(data?.profit || 0)}</div>}
+            <div className="flex items-center gap-1.5 mt-2"><TrendingUp size={11} style={{ color: 'var(--gold)', opacity: 0.7 }} /><span className="text-xs" style={{ color: 'rgba(201,151,58,0.6)' }}>Net</span></div>
           </div>
         </div>
 
-        {/* Revenue chart */}
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <div>
-              <p className="stat-label">14-Day Revenue</p>
-            </div>
-            <Sparkles size={14} style={{ color: 'var(--gold)', opacity: 0.6 }} />
+            <p className="stat-label">14-Day Revenue</p>
+            <Sparkles size={13} style={{ color: 'var(--gold)', opacity: 0.5 }} />
           </div>
-          {loading ? (
-            <div className="skeleton h-28 w-full" />
-          ) : (
-            <ResponsiveContainer width="100%" height={112}>
-              <AreaChart data={data?.recentSales || []} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-                <defs>
-                  <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#C9973A" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#C9973A" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone" dataKey="revenue"
-                  stroke="#C9973A" strokeWidth={1.5}
-                  fill="url(#goldGrad)" dot={false}
-                />
+          {loading ? <div className="skeleton h-24 w-full" /> : (
+            <ResponsiveContainer width="100%" height={96}>
+              <AreaChart data={data?.chart || []} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
+                <defs><linearGradient id="gg" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#C9973A" stopOpacity={0.3} /><stop offset="95%" stopColor="#C9973A" stopOpacity={0} /></linearGradient></defs>
+                <Tooltip content={<Tip />} />
+                <Area type="monotone" dataKey="revenue" stroke="#C9973A" strokeWidth={2} fill="url(#gg)" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        {/* Stats row */}
         <div className="grid grid-cols-2 gap-3">
           <div className="card-sm flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(74,144,217,0.15)' }}>
-              <Package size={18} style={{ color: 'var(--blue)' }} />
-            </div>
-            <div>
-              <div className="font-mono text-xl font-medium text-cream">{loading ? 'â' : data?.liveProducts}</div>
-              <div className="stat-label">Live Products</div>
-            </div>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(74,144,217,0.12)' }}><Package size={18} style={{ color: 'var(--blue)' }} /></div>
+            <div><div className="font-mono text-xl font-semibold" style={{ color: 'var(--cream)' }}>{loading ? '—' : data?.live}</div><div className="stat-label">Live</div></div>
           </div>
-
           <div className="card-sm flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(224,82,82,0.15)' }}>
-              <Clock size={18} style={{ color: 'var(--red)' }} />
-            </div>
-            <div>
-              <div className="font-mono text-xl font-medium text-cream">{loading ? 'â' : data?.pendingApprovals}</div>
-              <div className="stat-label">Need Review</div>
-            </div>
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(224,82,82,0.12)' }}><Clock size={18} style={{ color: 'var(--red)' }} /></div>
+            <div><div className="font-mono text-xl font-semibold" style={{ color: 'var(--cream)' }}>{loading ? '—' : data?.pending}</div><div className="stat-label">Review</div></div>
           </div>
         </div>
 
-        {/* Tax set-aside */}
-        <div className="card border-dashed" style={{ borderColor: 'rgba(201,151,58,0.3)' }}>
+        <div className="card" style={{ borderColor: 'rgba(201,151,58,0.2)', background: 'linear-gradient(145deg,rgba(201,151,58,0.05),#141414)' }}>
           <div className="flex items-center justify-between">
             <div>
-              <p className="stat-label mb-1">Set Aside for Taxes (28%)</p>
-              <p className="font-mono text-lg font-medium" style={{ color: 'var(--gold-light)' }}>
-                {loading ? 'â' : formatCurrency(data?.taxSetAside || 0)}
-              </p>
+              <p className="stat-label mb-1">Set Aside for Taxes ({taxPct}%)</p>
+              <p className="font-mono text-xl font-semibold" style={{ color: 'var(--gold-light)' }}>{loading ? '—' : fmt(data?.taxSetAside || 0)}</p>
             </div>
-            <Link href="/tax">
-              <div className="flex items-center gap-1 text-xs" style={{ color: 'rgba(201,151,58,0.6)' }}>
-                <span>Details</span>
-                <ChevronRight size={12} />
-              </div>
-            </Link>
+            <Link href="/tax"><div className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: 'rgba(201,151,58,0.6)', background: 'rgba(201,151,58,0.08)', border: '1px solid rgba(201,151,58,0.15)' }}>Details <ChevronRight size={12} /></div></Link>
           </div>
         </div>
 
-        {/* Seasonal alert */}
-        {!loading && data?.upcomingSeason && (
-          <div className="card" style={{ background: 'rgba(201,151,58,0.06)', borderColor: 'rgba(201,151,58,0.2)' }}>
+        {!loading && data?.season && (
+          <div className="card" style={{ borderColor: 'rgba(201,151,58,0.2)', background: 'rgba(201,151,58,0.04)' }}>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: 'rgba(201,151,58,0.15)' }}>
-                {data.upcomingSeason.urgency === 'CREATE NOW' ? (
-                  <Flame size={18} style={{ color: 'var(--gold)' }} />
-                ) : (
-                  <Calendar size={18} style={{ color: 'var(--gold)' }} />
-                )}
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(201,151,58,0.12)' }}>
+                {data.season.urgency === 'CREATE NOW' ? <Flame size={18} style={{ color: 'var(--gold)' }} /> : <Calendar size={18} style={{ color: 'var(--gold)' }} />}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-sm font-medium text-cream">{data.upcomingSeason.name}</span>
-                  <span className="badge badge-gold">{data.upcomingSeason.urgency}</span>
-                </div>
-                <p className="text-xs" style={{ color: 'rgba(240,235,224,0.5)' }}>
-                  {data.upcomingSeason.weeks} weeks away Â· Start creating now
-                </p>
+                <div className="flex items-center gap-2 mb-0.5"><span className="text-sm font-medium" style={{ color: 'var(--cream)' }}>{data.season.name}</span><span className="badge badge-gold">{data.season.urgency}</span></div>
+                <p className="text-xs" style={{ color: 'rgba(240,235,224,0.45)' }}>{data.season.weeks} weeks away · Start creating now</p>
               </div>
-              <Link href="/trends">
-                <ChevronRight size={16} style={{ color: 'rgba(201,151,58,0.5)' }} />
-              </Link>
+              <Link href="/trends"><ChevronRight size={16} style={{ color: 'rgba(201,151,58,0.4)' }} /></Link>
             </div>
           </div>
         )}
 
-        {/* Top product */}
-        {!loading && data?.topProduct && (
+        {!loading && data?.top && (
           <div className="card-sm">
             <p className="stat-label mb-2">Top Product</p>
             <div className="flex items-center justify-between">
-              <p className="text-sm text-cream font-medium truncate flex-1 mr-3">{data.topProduct.title}</p>
-              <span className="font-mono text-sm" style={{ color: 'var(--green)' }}>
-                {formatCurrency(data.topProduct.revenue)}
-              </span>
+              <p className="text-sm font-medium truncate flex-1 mr-3" style={{ color: 'var(--cream)' }}>{data.top.title}</p>
+              <span className="font-mono text-sm" style={{ color: 'var(--green)' }}>{fmt(data.top.total_revenue || 0)}</span>
             </div>
           </div>
         )}
 
-        {/* Quick actions */}
-        <div className="pt-2">
+        <div>
           <p className="stat-label mb-3 px-1">Quick Actions</p>
           <div className="grid grid-cols-2 gap-3">
-            <Link href="/approval">
-              <div className="card-sm flex items-center gap-3 active:scale-95 transition-transform">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: 'rgba(76,175,125,0.15)' }}>
-                  <AlertCircle size={16} style={{ color: 'var(--green)' }} />
-                </div>
-                <span className="text-sm font-medium">Review Queue</span>
-              </div>
-            </Link>
-            <Link href="/trends">
-              <div className="card-sm flex items-center gap-3 active:scale-95 transition-transform">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                  style={{ background: 'rgba(74,144,217,0.15)' }}>
-                  <TrendingUp size={16} style={{ color: 'var(--blue)' }} />
-                </div>
-                <span className="text-sm font-medium">View Trends</span>
-              </div>
-            </Link>
+            <Link href="/approval"><div className="action-card flex items-center gap-3"><div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(76,175,125,0.12)' }}><AlertCircle size={17} style={{ color: 'var(--green)' }} /></div><span className="text-sm font-medium" style={{ color: 'var(--cream)' }}>Review Queue</span></div></Link>
+            <Link href="/trends"><div className="action-card flex items-center gap-3"><div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: 'rgba(74,144,217,0.12)' }}><TrendingUp size={17} style={{ color: 'var(--blue)' }} /></div><span className="text-sm font-medium" style={{ color: 'var(--cream)' }}>View Trends</span></div></Link>
           </div>
         </div>
-
       </div>
-
       <Navigation />
     </div>
   )
