@@ -59,7 +59,7 @@ export default function ProductsPage() {
         <h1 className="font-serif text-2xl" style={{ color: 'var(--cream)' }}>Products</h1>
         <div className="flex items-center gap-4 mt-2">
           <span className="text-xs" style={{ color: 'rgba(240,235,224,0.5)' }}>{liveCount} live</span>
-          <span className="text-xs font-mono" style={{ color: 'rgba(240,235,224,0.5)' }}>${totalRevenue.toFixed(0)} total</span>
+          <span className="text-xs font-mono" style={{ color: 'rgba(240,235,224,0.5)' }}>{totalRevenue.toFixed(0)} total</span>
         </div>
       </div>
 
@@ -128,7 +128,7 @@ export default function ProductsPage() {
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                {product.list_price ? <p className="font-mono text-sm" style={{ color: 'var(--cream)' }}>${product.list_price.toFixed(2)}</p> : null}
+                {product.list_price ? <p className="font-mono text-sm" style={{ color: 'var(--cream)' }}>{product.list_price.toFixed(2)}</p> : null}
                 {product.margin_pct && product.margin_pct > 0 ? <p className="text-xs font-mono" style={{ color: 'var(--green)' }}>{product.margin_pct.toFixed(0)}%</p> : null}
                 {product.total_sales > 0 ? <p className="text-xs mt-0.5" style={{ color: 'rgba(240,235,224,0.35)' }}>{product.total_sales} sales</p> : null}
               </div>
@@ -136,7 +136,7 @@ export default function ProductsPage() {
             {product.total_revenue > 0 && (
               <div className="mt-3 flex items-center justify-between">
                 <span className="stat-label">Lifetime Revenue</span>
-                <span className="font-mono text-xs" style={{ color: 'var(--green)' }}>${product.total_revenue.toFixed(0)}</span>
+                <span className="font-mono text-xs" style={{ color: 'var(--green)' }}>{product.total_revenue.toFixed(0)}</span>
               </div>
             )}
           </div>
