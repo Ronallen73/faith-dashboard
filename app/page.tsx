@@ -23,7 +23,7 @@ interface DashboardData {
 const formatCurrency = (n: number) =>
   n >= 1000 ? `$${(n / 1000).toFixed(1)}k` : `$${n.toFixed(0)}`
 
-const VERSE = '"Whatever you do, work at it with all your heart." — Col 3:23'
+const VERSE = '"Whatever you do, work at it with all your heart." â Col 3:23'
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -107,7 +107,7 @@ export default function Dashboard() {
         <div className="flex items-start justify-between mb-1">
           <div>
             <p className="text-xs tracking-widest uppercase text-gold-500 mb-1 font-medium">Faith Business</p>
-            <h1 className="font-serif text-2xl text-cream">{setting} ✝</h1>
+            <h1 className="font-serif text-2xl text-cream">{greeting} â</h1>
           </div>
           {data?.pendingApprovals ? (
             <Link href="/approval">
@@ -194,7 +194,7 @@ export default function Dashboard() {
               <Package size={18} style={{ color: 'var(--blue)' }} />
             </div>
             <div>
-              <div className="font-mono text-xl font-medium text-cream">{loading ? '—' : data?.liveProducts}</div>
+              <div className="font-mono text-xl font-medium text-cream">{loading ? 'â' : data?.liveProducts}</div>
               <div className="stat-label">Live Products</div>
             </div>
           </div>
@@ -205,7 +205,7 @@ export default function Dashboard() {
               <Clock size={18} style={{ color: 'var(--red)' }} />
             </div>
             <div>
-              <div className="font-mono text-xl font-medium text-cream">{loading ? '—' : data?.pendingApprovals}</div>
+              <div className="font-mono text-xl font-medium text-cream">{loading ? 'â' : data?.pendingApprovals}</div>
               <div className="stat-label">Need Review</div>
             </div>
           </div>
@@ -217,7 +217,7 @@ export default function Dashboard() {
             <div>
               <p className="stat-label mb-1">Set Aside for Taxes (28%)</p>
               <p className="font-mono text-lg font-medium" style={{ color: 'var(--gold-light)' }}>
-                {loading ? '—' : formatCurrency(data?.taxSetAside || 0)}
+                {loading ? 'â' : formatCurrency(data?.taxSetAside || 0)}
               </p>
             </div>
             <Link href="/tax">
@@ -247,7 +247,7 @@ export default function Dashboard() {
                   <span className="badge badge-gold">{data.upcomingSeason.urgency}</span>
                 </div>
                 <p className="text-xs" style={{ color: 'rgba(240,235,224,0.5)' }}>
-                  {data.upcomingSeason.weeks} weeks away · Start creating now
+                  {data.upcomingSeason.weeks} weeks away Â· Start creating now
                 </p>
               </div>
               <Link href="/trends">
