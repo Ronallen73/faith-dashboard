@@ -64,7 +64,7 @@ export default function ProductsPage() {
         <div className="relative">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: 'rgba(240,235,224,0.3)' }} />
           <input type="text" placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9.spr pr-4 py-2.5 rounded-xl text-sm outline-none" style={{ paddingLeft: '36px', background: 'var(--surface-2)', border: '1px solid var(--surface-3)', color: 'var(--cream)' }} />
+            className="w-full pr-4 py-2.5 rounded-xl text-sm outline-none" style={{ paddingLeft: '36px', background: 'var(--surface-2)', border: '1px solid var(--surface-3)', color: 'var(--cream)' }} />
         </div>
       </div>
       <div className="flex gap-2 px-4 overflow-x-auto mb-1" style={{ scrollbarWidth: 'none' }}>
@@ -72,11 +72,10 @@ export default function ProductsPage() {
       </div>
       <div className="flex items-center gap-2 px-4 mb-4 mt-3">
         <Filter size={12} style={{ color: 'rgba(240,235,224,0.3)' }} />
-        {('__revenue__ margin recent'.split(' ').filter(x => x).map(s => s.trim()).filter(x => x.length).map((s, i) => {
-          const labels = ['Revenue', 'Margin', 'Recent']
-          const keys = ['revenue', 'margin', 'recent'] as const
-          return <button key={keys[i]} onClick={() => setSortBy(keys[i])} className="text-xs px-2.5 py-1 rounded-lg transition-all" style={{ background: sortBy === keys[i] ? 'rgba(201,151,58,0.12)' : 'transparent', color: sortBy === keys[i] ? 'var(--gold)' : 'rgba(240,235,224,0.35)' }}>{labels[i]}</button>
-        }))}
+        {['Revenue', 'Margin', 'Recent'].map((label, i) => {
+          const key = (['revenue', 'margin', 'recent'] as ['revenue','margin','recent'])[i]
+          return <button key={key} onClick={() => setSortBy(key)} className="text-xs px-2.5 py-1 rounded-lg transition-all" style={{ background: sortBy === key ? 'rgba(201,151,58,0.12)' : 'transparent', color: sortBy === key ? 'var(--gold)' : 'rgba(240,235,224,0.35)' }}>{label}</button>
+        })}
       </div>
       <div className="px-4 space-y-3 page-enter">
         {loading ? Array.from({ length: 5 }).map((_, i) => <div key={i} className="skeleton h-20 w-full" />)
